@@ -194,3 +194,4 @@ train_corpus.txt
 *.npy
 model*
 *corpus*
+album_images
