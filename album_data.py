@@ -7,15 +7,15 @@ import json
 
 class WordDictionary:
     def __init__(self, base_path, vocab_size=50000):
-        self.VOCAB_SIZE = 50000
+        self.VOCAB_SIZE = vocab_size
         self.UNKNOWN_WORD = '<unk>'
         self.UNKNOWN_IDX = self.VOCAB_SIZE
         self.base_path = base_path
         self.files = self.get_files()
-        self.dictionary, self.reverse_dict = self.build_dictionary(
-            self.files, vocab_size=vocab_size)  # word -> idx
+        self.dictionary, self.reverse_dict = self.build_dictionary(self.files)
         self.skip_gram_pairs = self.build_word_pairs()
-        self.test_data, self.train_data = self.split_train_test_data()  # train / test pairs
+        # train / test pairs
+        self.test_data, self.train_data = self.split_train_test_data()
 
     def split_train_test_data(self, ratio=0.15):
         total_len = len(self.skip_gram_pairs)
@@ -26,7 +26,8 @@ class WordDictionary:
     def build_word_pairs_file(self, filename):
         word_indices = self.word_to_idx_file(filename)
         pairs = self.word_pairs(word_indices, window_size=1)
-        # debug - better turn off due to I/O latency
+
+        # prints for debug - better turn off due to I/O latency
         # print('Created word pairs for file : {}'.format(filename))
         # print(pairs) # debug
         return pairs
@@ -113,13 +114,14 @@ class WordDictionary:
                          reverse_dict_filename='reverse_dict.json'):
         # if the file exists, simply read the file and store as dictionary
         if os.path.exists(dictionary_filename) and os.path.exists(reverse_dict_filename):
+            print('Opening dictionary file')
             with open(dictionary_filename, 'r') as dict_json:
                 dictionary = json.load(dict_json)
             with open(reverse_dict_filename, 'r') as rev_dict_json:
                 reverse_dict = json.load(rev_dict_json)
         else:
             words = list()
-            print('The saved dictionary information does not exist - creating dictionary.')
+            print('The dictionary file does not exist - creating dictionary.')
             print('Reading file...')
             for file in filelist:
                 with open(os.path.join(self.base_path, file)) as f:
@@ -143,17 +145,17 @@ class WordDictionary:
             reverse_dict = dict(zip(dictionary.values(), dictionary.keys()))
             reverse_dict[self.UNKNOWN_IDX] = self.UNKNOWN_WORD
 
-            print('Saving dictionary to file...')
+            print('Saving dictionary to file')
             with open(dictionary_filename, 'w') as dict_json:
                 json.dump(dictionary, dict_json, ensure_ascii=False)
             with open(reverse_dict_filename, 'w') as rev_dict_json:
                 json.dump(reverse_dict, rev_dict_json, ensure_ascii=False)
+
         return dictionary, reverse_dict
 
 
 if __name__ == '__main__':
     base_path = os.path.join(os.getcwd(), 'bugs_albums')
-
     wdic = WordDictionary(base_path)
     # wdic.word_to_idx_file('266812')
     # wdic.build_word_pairs_file('266812')
@@ -191,6 +193,7 @@ if __name__ == '__main__':
     loss = tf.reduce_mean(nce_loss)
     tf.summary.scalar('loss', loss)  # attach summary for tensorboard usage
 
+    # optimizer
     train_op = tf.train.AdamOptimizer(0.01).minimize(loss)
     print('optimizer ready')
 
@@ -227,11 +230,11 @@ if __name__ == '__main__':
             if step % 1000 == 0:
                 similarity_val = sess.run(similarity)
                 for idx in range(valid_size):
-                    valid_word = wdic.reverse_dict[valid_examples[idx]]
+                    valid_word = wdic.reverse_dict[str(valid_examples[idx])]
                     top_k = 6
                     nearest = (-similarity_val[idx, :]).argsort()[1:top_k + 1]
-                    print('Nearest top 6 words to : '.format(valid_word))
+                    print('Nearest top 6 words to : {}'.format(valid_word))
                     for word_idx in nearest:
-                        print('{}'.format(wdic.reverse_dict[word_idx]))
+                        print('{}'.format(wdic.reverse_dict[str(word_idx)]))
 
         trained_embeddings = embeddings.eval()

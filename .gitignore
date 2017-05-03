@@ -187,3 +187,10 @@ bugs_albums
 logs
 dictionary.json
 reverse_dict.json
+
+word_pair.json
+train_corpus.txt
+
+*.npy
+model*
+*corpus*
