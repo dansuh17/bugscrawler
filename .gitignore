@@ -195,3 +195,4 @@ train_corpus.txt
 model*
 *corpus*
 album_images
+album_info.csv
