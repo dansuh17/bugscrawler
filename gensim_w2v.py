@@ -27,23 +27,12 @@ def create_corpus():
     # print('The review files for test : {}'.format(len(test_files)))
 
     print('Creating train corpus')
-    with open('train_corpus_keywords.txt', 'w') as train_corpus_file:
+    with open('corpus/train_corpus_keywords.txt', 'w') as train_corpus_file:
         for trainfile in train_files:
             with open(os.path.join('bugs_albums', trainfile)) as f:
                 lines = f.readlines()
                 lines = ('{}\n'.format(preprocess(l)) for l in lines)
                 train_corpus_file.writelines(lines)
-
-"""
-    print('Creating test corpus')
-    with open('test_corpus.txt', 'w') as test_corpus_file:
-        for testfile in test_files:
-            with open(os.path.join('bugs_albums', testfile)) as f:
-                lines = f.readlines()
-                lines = ('{}\n'.format(l) for l in lines)
-                test_corpus_file.writelines(lines)
-"""
-
 
 class SentenceReader:
     def __init__(self, filepath):
@@ -53,16 +42,19 @@ class SentenceReader:
         for line in open(self.filepath):
             yield line.split(' ')
 
-create_corpus()  # create a corpus text
+# create a corpus text
+create_corpus()
 
-sentences_vocab = SentenceReader('train_corpus_keywords.txt')
-sentences_train = SentenceReader('train_corpus_keywords.txt')
+# sentence reader
+sentences_vocab = SentenceReader('corpus/train_corpus_keywords.txt')
+sentences_train = SentenceReader('corpus/train_corpus_keywords.txt')
 
 # train!
 model = gensim.models.Word2Vec()
 model.build_vocab(sentences_vocab)
 model.train(sentences_train, total_examples=model.corpus_count, epochs=model.iter)
 
+# save model
 model.save('model-keywords')
 
 # load model

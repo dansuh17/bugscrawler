@@ -2,8 +2,14 @@ from bs4 import BeautifulSoup
 import os
 import requests
 import threading
-import queue
+import signal
+import sys
 import pandas as pd
+
+try:
+    import queue  # python 3
+except ImportError:
+    import Queue as queue  # python 2
 
 
 class AlbumInfo:
@@ -14,6 +20,12 @@ class AlbumInfo:
         self.album_url_base = 'http://music.bugs.co.kr/album/{}'
         self.img_dir = 'album_images'
 
+        if os.path.exists('album_info.csv'):
+            self.existing_df = pd.read_csv('album_info.csv', index_col=0)
+            print(list(self.existing_df))
+        else:
+            self.existing_df = pd.DataFrame()
+
     def save_image(self, albumid):
         album_url = self.album_url_base.format(albumid)
         page = requests.get(album_url)
@@ -23,8 +35,14 @@ class AlbumInfo:
             information_box = soup.find('div', class_='basicInfo')
             album_img = information_box.find('img')
             img_url = album_img.attrs['src']
-            with open(os.path.join(self.img_dir, '{}.jpg').format(albumid),
-                      'wb') as img_file:
+            filepath = os.path.join(self.img_dir, '{}.jpg').format(albumid)
+
+            # no need to download if it already exists
+            if os.path.exists(filepath):
+                return
+
+            # save the image file
+            with open(filepath, 'wb') as img_file:
                 res = requests.get(img_url, stream=True)
                 if not res.ok:
                     print(res)
@@ -35,6 +53,9 @@ class AlbumInfo:
         except AttributeError:
             print('No image for id : {}'.format(albumid))
             return
+
+    def info_already_exists(self, albumid):
+        return int(albumid) in self.existing_df.index
 
     def save_info(self, albumid):
         album_url = self.album_url_base.format(albumid)
@@ -72,15 +93,27 @@ class AlbumInfo:
             print('No sufficient atributes for id : {}'.format(albumid))
             return
 
+    def signal_handler(self, signal, frame):
+        print('SIGINT recieved')
+        print('Saving album_info.csv')
+        self.create_csv()
+        sys.exit(0)
+
     def create_csv(self):
         # convert to pandas Series for convenient transformation into DataFrame
         for key in self.series_dict:
+            # each series_dict[field_name] is a pandas.Series with indices.
             self.series_dict[key] = pd.Series(self.series_dict[key])
         album_info_df = pd.DataFrame(self.series_dict)
+        album_info_df.columns.values[0] = 'index'
+
+        # concatenate information with already existing dataframe
+        aggregated = pd.concat([self.existing_df, album_info_df])
 
         # finally - write to csv
-        album_info_df.to_csv('album_info.csv', encoding='utf-8',
-                             header=True, index=True)
+        aggregated.to_csv('album_info.csv', encoding='utf-8',
+                          header=True)
+        print('CSV written successfully!')
 
 
 class WorkerThread(threading.Thread):
@@ -94,8 +127,13 @@ class WorkerThread(threading.Thread):
             albumid_message = self.queue.get()
             if isinstance(albumid_message, str) and albumid_message == 'quit':
                 break
-            ai.save_image(albumid_message)
-            ai.save_info(albumid_message)
+            # collect only if the info is missing
+            if not ai.info_already_exists(albumid_message):
+                ai.save_image(albumid_message)
+                ai.save_info(albumid_message)
+            else:
+                print('Information for id {} already exists.'
+                      .format(albumid_message))
 
 
 def build_worker_pool(queue, size, album_info):
@@ -112,10 +150,15 @@ if __name__ == '__main__':
     album_ids = os.listdir(album_dir)
 
     ai = AlbumInfo()
+    # for graceful termination
+    signal.signal(signal.SIGINT, ai.signal_handler)
+
     thread_info_list = []
     queue = queue.Queue()
+    # build worker threads
     worker_threads = build_worker_pool(queue, 4, ai)
 
+    # put album id's for threads to process
     for albumid in album_ids:
         queue.put(albumid)
 

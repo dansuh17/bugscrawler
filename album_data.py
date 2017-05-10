@@ -206,7 +206,6 @@ if __name__ == '__main__':
     # similarity matrix result shape = (valid_size, vocab_size), each row contains similarity
     similarity = tf.matmul(valid_embeddings, normalized_embeddings, transpose_b=True)
 
-
     # start session
     with tf.Session() as sess:
         # merge summaries and write out to logs folder
