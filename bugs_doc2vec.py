@@ -3,6 +3,7 @@ import os
 import numpy as np
 import random
 from collections import Counter
+import pandas as pd
 
 dangerous_keywords = ['[', ']', '(', ')', '{', '}', '\'', '\"', ',',
                       '<', '>', '.', ';', ':', '\t', '\n']
@@ -19,6 +20,9 @@ def delete_empty():
             if total_string == '':
                 print('Removing empty file : {}'.format(file_num))
                 os.remove(filepath)
+
+def read_album_info(filename):
+    pd.read_csv(filename, index_col=0)
 
 
 def preprocess(line):
@@ -38,7 +42,7 @@ def create_tagged_doc_corpus():
         for trainfile in train_files:
             with open(os.path.join('bugs_albums', trainfile), 'r') as f:
                 lines = f.readlines()
-                lines = ('{}\t{}\n'.format(trainfile, preprocess(l)) for l in lines)
+                lines = ('{}\t{}\n'.format(trainfile, preprocess(l, trainfile)) for l in lines)
                 corpus_file.writelines(lines)
 
 
