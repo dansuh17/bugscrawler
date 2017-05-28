@@ -21,13 +21,36 @@ def delete_empty():
                 print('Removing empty file : {}'.format(file_num))
                 os.remove(filepath)
 
-def read_album_info(filename):
-    pd.read_csv(filename, index_col=0)
 
-
-def preprocess(line):
+def preprocess(line, train_file_name, df, replace_names=True):
+    print('preprocessing : {}'.format(train_file_name))
+    # delete keywords
     for keyword in dangerous_keywords:
         line = line.replace(keyword, ' ')
+
+    if replace_names:
+        # replace album name - choose the '앨범명' column and returns a Series
+        album_name_series = df.loc[df['index'] == int(train_file_name)]['앨범명']
+        try:
+            album_name = str(album_name_series.iloc[0])  # access first row's value
+        except IndexError:
+            album_name = None
+
+        if album_name != '' and album_name is not None:
+            album_name_to_replace = '[[{}]]'.format(train_file_name)
+            line = line.replace(album_name, album_name_to_replace)
+
+        # replace artist name
+        artist_name_series = df.loc[df['index'] == int(train_file_name)]['아티스트']
+
+        try:
+            artist_name = str(artist_name_series.iloc[0])
+        except IndexError:
+            artist_name = None
+
+        if artist_name != '' and artist_name is not None:
+            artist_name_to_replace = '(({}))'.format(train_file_name)
+            line = line.replace(artist_name, artist_name_to_replace)
     return line
 
 
@@ -38,12 +61,16 @@ def create_tagged_doc_corpus():
     train_files = np.random.permutation(file_list)
     print('The review files for train : {}'.format(num_files))
 
+    # read album info file
+    info_df = pd.read_csv('album_info.csv', index_col=False)
+
     with open(os.path.join('corpus', filename), 'w') as corpus_file:
         for trainfile in train_files:
             with open(os.path.join('bugs_albums', trainfile), 'r') as f:
                 lines = f.readlines()
-                lines = ('{}\t{}\n'.format(trainfile, preprocess(l, trainfile)) for l in lines)
-                corpus_file.writelines(lines)
+                # format : <trainfile> \t <preprocessed line> \n
+                lines = ('{}\t{}\n'.format(trainfile, preprocess(l, trainfile, info_df)) for l in lines)
+                corpus_file.writelines(lines)  # write to file
 
 
 def read_data():
@@ -55,7 +82,7 @@ def read_data():
         try:
             train_docs.append((row[1].split(' '), [int(row[0])]))
         except IndexError:
-            print(row)
+            print('read_data() IndexError: {}'.format(row))
     tagged_train_docs = [doc2vec.TaggedDocument(words=doc, tags=tag) for doc, tag in train_docs]
     return tagged_train_docs
 
@@ -68,21 +95,21 @@ def read_data():
 # read in data
 print('Reading data')
 tagged_train_docs = read_data()
-print(len(tagged_train_docs))
-print(tagged_train_docs[:2])
+print('length of train_docs : {}'.format(len(tagged_train_docs)))
+print(tagged_train_docs[:2])  # sample doc
 
 # train!
-model = doc2vec.Doc2Vec(size=300)
+model = doc2vec.Doc2Vec(size=50)
 print('Build vocab')
 model.build_vocab(tagged_train_docs)
 print('Train')
-model.train(tagged_train_docs)
+model.train(tagged_train_docs, total_examples=model.corpus_count, epochs=model.iter)
 
 # save model
 model.save('models/doc2vec_simple')
 
 # load model
-# model = gensim.models.doc2vec.Doc2Vec.load('models/doc2vec_simple')
+model = doc2vec.Doc2Vec.load('models/doc2vec_simple')
 
 # test model
 print(model.infer_vector(['감성', '힙합']))
