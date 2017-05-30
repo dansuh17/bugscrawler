@@ -99,33 +99,48 @@ print('length of train_docs : {}'.format(len(tagged_train_docs)))
 print(tagged_train_docs[:2])  # sample doc
 
 # train!
-model = doc2vec.Doc2Vec(size=50)
-print('Build vocab')
-model.build_vocab(tagged_train_docs)
-print('Train')
-model.train(tagged_train_docs, total_examples=model.corpus_count, epochs=model.iter)
+# model = doc2vec.Doc2Vec(size=50, min_count=5)  # reduce dictionary size
+# print('Build vocab')
+# model.build_vocab(tagged_train_docs)
+# print('Train')
+# model.train(tagged_train_docs, total_examples=model.corpus_count, epochs=model.iter)
 
 # save model
-model.save('models/doc2vec_simple')
+# print('Model Saved')
+# model.save('models/doc2vec_simple')
 
 # load model
+print('Loading Model')
 model = doc2vec.Doc2Vec.load('models/doc2vec_simple')
+model.delete_temporary_training_data()  # save memory
+model.init_sims(replace=True)
+print('Model Loaded')
+print('Dictionary size : {}'.format(model.corpus_count))
+print('Estimated memory : {}'.format(model.estimate_memory()))
+print('')
+
 
 # test model
+print('testing')
 print(model.infer_vector(['감성', '힙합']))
 
-# test with all documents in the training set
-ranks = []
-second_ranks = []
-for doc_id in range(len(tagged_train_docs)):
-    inferred_vector = model.infer_vector(tagged_train_docs[doc_id].words)
-    sims = model.docvecs.most_similar([inferred_vector],
-                                      topn=len(model.docvecs))
-    rank = [docid for docid, sim in sims].index(doc_id)
-    ranks.append(rank)
+# test most similar
+my_vec = model.infer_vector(['감성', '힙합'])
+# TODO: discard non-normalized syn0 and replace it with syn0norm.
+print(model.docvecs.most_similar([my_vec], topn=10))
 
-    second_ranks.append(sims[1])
-print(Counter(ranks))  # Results vary due to random seeding and very small corpus
+# test with all documents in the training set
+# ranks = []
+# second_ranks = []
+# for doc_id in range(len(tagged_train_docs)):
+#     inferred_vector = model.infer_vector(tagged_train_docs[doc_id].words)
+#     sims = model.docvecs.most_similar([inferred_vector],
+#                                       topn=len(model.docvecs))
+#     rank = [docid for docid, sim in sims].index(doc_id)
+#     ranks.append(rank)
+# 
+#     second_ranks.append(sims[1])
+# print(Counter(ranks))  # Results vary due to random seeding and very small corpus
 
 # Pick a random document from the test corpus and infer a vector from the model
 doc_id = random.randint(0, len(tagged_train_docs))
