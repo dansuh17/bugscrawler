@@ -122,12 +122,17 @@ print('')
 
 # test model
 print('testing')
-print(model.infer_vector(['감성', '힙합']))
+print(model.infer_vector(['크리스마스', '캐롤', '겨울']))
 
 # test most similar
-my_vec = model.infer_vector(['감성', '힙합'])
+my_vec = model.infer_vector(['크리스마스', '캐롤', '겨울'])
 # TODO: discard non-normalized syn0 and replace it with syn0norm.
-print(model.docvecs.most_similar([my_vec], topn=10))
+print('most similar to 감성, 힙합')
+similar_doc = model.docvecs.most_similar([my_vec], topn=10)
+top_sim_idxs = [sim[0] for sim in similar_doc]
+print(similar_doc)
+print(top_sim_idxs)
+print([rec.words for rec in tagged_train_docs if rec.tags[0] in top_sim_idxs])
 
 # test with all documents in the training set
 # ranks = []
@@ -143,9 +148,9 @@ print(model.docvecs.most_similar([my_vec], topn=10))
 # print(Counter(ranks))  # Results vary due to random seeding and very small corpus
 
 # Pick a random document from the test corpus and infer a vector from the model
-doc_id = random.randint(0, len(tagged_train_docs))
+# doc_id = random.randint(0, len(tagged_train_docs))
 
 # Compare and print the most/median/least similar documents from the train corpus
-print('Train Document ({}): «{}»\n'.format(doc_id, ' '.join(tagged_train_docs[doc_id].words)))
+# print('Train Document ({}): «{}»\n'.format(doc_id, ' '.join(tagged_train_docs[doc_id].words)))
 sim_id = second_ranks[doc_id]
 print('Similar Document {}: «{}»\n'.format(sim_id, ' '.join(tagged_train_docs[sim_id[0]].words)))
