@@ -21,6 +21,19 @@ def delete_empty():
                 print('Removing empty file : {}'.format(file_num))
                 os.remove(filepath)
 
+def get_label(train_file_id, df):
+    row = df.loc[df['index'] == int(train_file_id)]
+    try:
+        style = [row['스타일'].iloc[0].strip()]  # access the first row's value
+    except (AttributeError, IndexError):
+        style = []
+
+    try:
+        genre = [g.strip() for g in row['장르'].iloc[0].split('\\')]
+    except (AttributeError, IndexError):
+        genre = []
+    return style + genre
+
 
 def preprocess(line, train_file_name, df, replace_names=True):
     print('preprocessing : {}'.format(train_file_name))
@@ -37,7 +50,7 @@ def preprocess(line, train_file_name, df, replace_names=True):
             album_name = None
 
         if album_name != '' and album_name is not None:
-            album_name_to_replace = '[[{}]]'.format(train_file_name)
+            album_name_to_replace = ' [[{}]] '.format(train_file_name)
             line = line.replace(album_name, album_name_to_replace)
 
         # replace artist name
@@ -49,7 +62,7 @@ def preprocess(line, train_file_name, df, replace_names=True):
             artist_name = None
 
         if artist_name != '' and artist_name is not None:
-            artist_name_to_replace = '(({}))'.format(train_file_name)
+            artist_name_to_replace = ' (({})) '.format(train_file_name)
             line = line.replace(artist_name, artist_name_to_replace)
     return line
 
@@ -73,14 +86,26 @@ def create_tagged_doc_corpus():
                 corpus_file.writelines(lines)  # write to file
 
 
-def read_data():
+def read_data(tag_with_genres=True):
+    # read in dataframe
+    info_df = pd.read_csv('album_info.csv', index_col=False)
+
     with open(os.path.join('corpus', filename), 'r') as f:
         # list of [id, 'sentence blahblah']
         data = [line.strip().split('\t') for line in f]
     train_docs = []
     for row in data:
         try:
-            train_docs.append((row[1].split(' '), [int(row[0])]))
+            id_num = int(row[0])
+            split_words = row[1].split(' ')
+            id_label = [id_num]
+
+            # also add genre tags in training docs
+            if tag_with_genres:
+                id_label += get_label(id_num, info_df)
+
+            # add the data
+            train_docs.append((split_words, id_label))
         except IndexError:
             print('read_data() IndexError: {}'.format(row))
     tagged_train_docs = [doc2vec.TaggedDocument(words=doc, tags=tag) for doc, tag in train_docs]
@@ -99,19 +124,19 @@ print('length of train_docs : {}'.format(len(tagged_train_docs)))
 print(tagged_train_docs[:2])  # sample doc
 
 # train!
-# model = doc2vec.Doc2Vec(size=50, min_count=5)  # reduce dictionary size
-# print('Build vocab')
-# model.build_vocab(tagged_train_docs)
-# print('Train')
-# model.train(tagged_train_docs, total_examples=model.corpus_count, epochs=model.iter)
+model = doc2vec.Doc2Vec(size=100, min_count=3)  # reduce dictionary size
+print('Build vocab')
+model.build_vocab(tagged_train_docs)
+print('Train')
+model.train(tagged_train_docs, total_examples=model.corpus_count, epochs=model.iter)
 
 # save model
-# print('Model Saved')
-# model.save('models/doc2vec_simple')
+print('Model Saved')
+model.save('models/doc2vec_2.0')
 
 # load model
 print('Loading Model')
-model = doc2vec.Doc2Vec.load('models/doc2vec_simple')
+model = doc2vec.Doc2Vec.load('models/doc2vec_2.0')
 model.delete_temporary_training_data()  # save memory
 model.init_sims(replace=True)
 print('Model Loaded')
@@ -143,7 +168,7 @@ print([rec.words for rec in tagged_train_docs if rec.tags[0] in top_sim_idxs])
 #                                       topn=len(model.docvecs))
 #     rank = [docid for docid, sim in sims].index(doc_id)
 #     ranks.append(rank)
-# 
+#
 #     second_ranks.append(sims[1])
 # print(Counter(ranks))  # Results vary due to random seeding and very small corpus
 
